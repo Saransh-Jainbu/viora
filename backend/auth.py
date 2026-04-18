@@ -12,7 +12,15 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from config import settings
 
 # ── Initialise Firebase Admin SDK (runs once) ────────────────────────────────
-_cred = credentials.Certificate(settings.firebase_service_account_key)
+firebase_creds_dict = {
+    "type": "service_account",
+    "project_id": settings.firebase_project_id,
+    "private_key": settings.firebase_private_key.replace('\\n', '\n'),
+    "client_email": settings.firebase_client_email,
+    "token_uri": "https://oauth2.googleapis.com/token",
+}
+_cred = credentials.Certificate(firebase_creds_dict)
+
 firebase_admin.initialize_app(
     _cred,
     {"databaseURL": settings.firebase_database_url},

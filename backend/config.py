@@ -11,16 +11,15 @@ class Settings(BaseSettings):
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
 
     # --- Ollama ---
-    ollama_base_url: str = Field(default="http://localhost:11434", alias="OLLAMA_BASE_URL")
+    ollama_base_url: str = Field(default="http://127.0.0.1:11434", alias="OLLAMA_BASE_URL")
 
     # --- Default LLM ---
     default_model: str = Field(default="gpt", alias="DEFAULT_MODEL")
 
     # --- Firebase ---
-    firebase_service_account_key: str = Field(
-        default="./firebase-service-account.json",
-        alias="FIREBASE_SERVICE_ACCOUNT_KEY",
-    )
+    firebase_project_id: str = Field(default="", alias="FIREBASE_PROJECT_ID")
+    firebase_private_key: str = Field(default="", alias="FIREBASE_PRIVATE_KEY")
+    firebase_client_email: str = Field(default="", alias="FIREBASE_CLIENT_EMAIL")
     firebase_database_url: str = Field(default="", alias="FIREBASE_DATABASE_URL")
 
     # --- Embedding ---
