@@ -23,6 +23,8 @@ import { auth } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+const baseURL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+
 type MessageSource = {
   text: string;
   page: number;
@@ -103,7 +105,7 @@ export default function DashboardPage() {
   const fetchCurrentModel = async (user: any) => {
     try {
       const token = await user.getIdToken();
-      const res = await fetch('http://127.0.0.1:8000/current-model', {
+      const res = await fetch(`${baseURL}/current-model`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -127,7 +129,7 @@ export default function DashboardPage() {
 
     try {
       const token = await currentUser.getIdToken();
-      const res = await fetch('http://127.0.0.1:8000/set-model', {
+      const res = await fetch(`${baseURL}/set-model`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -172,7 +174,7 @@ export default function DashboardPage() {
 
     try {
       const token = await currentUser.getIdToken();
-      const res = await fetch('http://127.0.0.1:8000/chat', {
+      const res = await fetch(`${baseURL}/chat`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -239,7 +241,7 @@ export default function DashboardPage() {
 
     try {
       const token = await currentUser.getIdToken();
-      const res = await fetch('http://127.0.0.1:8000/upload', {
+      const res = await fetch(`${baseURL}/upload`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`
