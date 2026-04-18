@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic-settings
+chromadb
+sentence-transformers
+langchain-text-splitters
+openai
+httpx
+PyPDF2
+python-docx
+firebase-admin
+python-dotenv
