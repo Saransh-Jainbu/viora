@@ -40,7 +40,7 @@ app = FastAPI(
 # ── CORS (allow the Next.js frontend) ────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:8000", "https://your-vercel-app.vercel.app"],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:8000", "https://viora-one.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
