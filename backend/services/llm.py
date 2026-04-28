@@ -3,7 +3,7 @@ LLM dispatch service.
 
 Supports two backends:
   • **gpt**   — OpenAI ChatCompletion (gpt-4)
-  • **llama** — Ollama REST API (local Llama model)
+  • **llama** — Hugging Face Serverless API (Llama 3)
 """
 
 import httpx
@@ -75,7 +75,7 @@ async def generate_response(
     if model_name == "gpt":
         return _call_openai(messages)
     elif model_name == "llama":
-        return await _call_ollama(messages)
+        return await _call_huggingface(messages)
     else:
         raise ValueError(f"Unknown model: '{model_name}'. Use 'gpt' or 'llama'.")
 
@@ -96,24 +96,26 @@ def _call_openai(messages: list[dict]) -> str:
     return content.replace("**", "")
 
 
-# ── Ollama (Llama) ────────────────────────────────────────────────────────────
+# ── Hugging Face (Llama) ────────────────────────────────────────────────────────────
 
-async def _call_ollama(messages: list[dict]) -> str:
-    """Call a local Ollama instance asynchronously via its REST API."""
-    url = f"{settings.ollama_base_url.rstrip('/')}/api/chat"
+async def _call_huggingface(messages: list[dict]) -> str:
+    """Call Hugging Face Serverless Inference API asynchronously."""
+    url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.huggingface_api_key}",
+        "Content-Type": "application/json",
+    }
     payload = {
-        "model": "llama3",
+        "model": "meta-llama/Meta-Llama-3-8B-Instruct",
         "messages": messages,
-        "stream": False,
-        "options": {
-            "temperature": 0.3,
-        },
+        "max_tokens": 1024,
+        "temperature": 0.3,
     }
 
     async with httpx.AsyncClient(timeout=120.0) as client:
-        resp = await client.post(url, json=payload)
+        resp = await client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
-        content = data.get("message", {}).get("content", "").strip()
+        content = data["choices"][0]["message"]["content"].strip()
         # Forcefully remove markdown bolding as a safety measure
         return content.replace("**", "")

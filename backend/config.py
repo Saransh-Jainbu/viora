@@ -10,8 +10,8 @@ class Settings(BaseSettings):
     # --- OpenAI ---
     openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
 
-    # --- Ollama ---
-    ollama_base_url: str = Field(default="http://127.0.0.1:11434", alias="OLLAMA_BASE_URL")
+    # --- Hugging Face ---
+    huggingface_api_key: str = Field(default="", alias="HUGGINGFACE_API_KEY")
 
     # --- Default LLM ---
     default_model: str = Field(default="gpt", alias="DEFAULT_MODEL")
