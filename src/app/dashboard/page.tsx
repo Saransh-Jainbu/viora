@@ -26,7 +26,8 @@ import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
-const baseURL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000';
+// Normalize backend URL to avoid accidental double-slashes (env may include trailing '/').
+const baseURL = (process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8000').replace(/\/+$/g, '');
 
 type MessageSource = {
   text: string;

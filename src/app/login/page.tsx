@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
@@ -11,7 +11,8 @@ import { auth, googleProvider } from '@/lib/firebase';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
-  signInWithPopup 
+  signInWithRedirect,
+  getRedirectResult,
 } from 'firebase/auth';
 import { toast } from 'sonner';
 
@@ -20,7 +21,34 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const router = useRouter();
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        router.replace('/dashboard');
+        return;
+      }
+
+      setCheckingAuth(false);
+    });
+
+    const handleRedirectResult = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result?.user) {
+          toast.success('Successfully logged in with Google');
+        }
+      } catch (error: any) {
+        toast.error(error.message || 'Google authentication failed');
+      }
+    };
+
+    void handleRedirectResult();
+
+    return () => unsubscribe();
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,17 +83,19 @@ export default function LoginPage() {
 
   const handleGoogleLogin = async () => {
     try {
-        await signInWithPopup(auth, googleProvider);
-        toast.success('Successfully logged in with Google');
-        router.push('/dashboard');
+      setLoading(true);
+      await signInWithRedirect(auth, googleProvider);
     } catch (error: any) {
-        toast.error(error.message || 'Google authentication failed');
+      toast.error(error.message || 'Google authentication failed');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-background">
-      {/* Centered Form */}
+      {checkingAuth ? null : (
+      /* Centered Form */
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -163,6 +193,7 @@ export default function LoginPage() {
             className="w-full"
             size="lg"
             onClick={handleGoogleLogin}
+            disabled={loading}
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
@@ -182,7 +213,7 @@ export default function LoginPage() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            Continue with Google
+            {loading ? 'Redirecting...' : 'Continue with Google'}
           </Button>
 
           {/* Toggle Sign In / Sign Up */}
@@ -213,6 +244,7 @@ export default function LoginPage() {
           </div>
         </motion.div>
       </motion.div>
+      )}
     </div>
   );
 }
