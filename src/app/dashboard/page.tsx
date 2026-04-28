@@ -53,6 +53,7 @@ type Chat = {
 export default function DashboardPage() {
   const router = useRouter();
   const { theme, toggleTheme } = useTheme();
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chats, setChats] = useState<Chat[]>([
     {
@@ -103,10 +104,13 @@ export default function DashboardPage() {
       setCurrentUser(user);
       if (user) {
         fetchCurrentModel(user);
+      } else {
+        router.replace('/login');
       }
+      setCheckingAuth(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   const fetchCurrentModel = async (user: any) => {
     try {
@@ -298,6 +302,7 @@ export default function DashboardPage() {
   };
 
   return (
+    checkingAuth ? null : (
     <div className="h-screen flex bg-background overflow-hidden">
       {/* Sidebar */}
       <AnimatePresence>
@@ -713,5 +718,6 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
     </div>
+    )
   );
 }
