@@ -6,6 +6,8 @@ Provides add / query operations used by the upload and chat routes.
 """
 
 import chromadb
+import os
+import tempfile
 from config import settings
 
 _client: chromadb.ClientAPI | None = None
@@ -20,11 +22,35 @@ def init_chroma():
     Called once at application startup.
     """
     global _client, _collection
-    _client = chromadb.PersistentClient(path=settings.chroma_persist_dir)
+    primary_path = settings.chroma_persist_dir
+    try:
+        os.makedirs(primary_path, exist_ok=True)
+        _client = chromadb.PersistentClient(path=primary_path)
+        print(f"[chroma] Using persistence path: {primary_path}")
+    except Exception as exc:
+        fallback_path = os.path.join(tempfile.gettempdir(), "viora_chroma_db")
+        os.makedirs(fallback_path, exist_ok=True)
+        _client = chromadb.PersistentClient(path=fallback_path)
+        print(f"[chroma] Failed to use '{primary_path}' ({exc}). Falling back to: {fallback_path}")
+
     _collection = _client.get_or_create_collection(
         name=COLLECTION_NAME,
         metadata={"hnsw:space": "cosine"},
     )
+
+
+def _sanitize_metadata_value(value):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float, str)):
+        return value
+    if value is None:
+        return ""
+    return str(value)
+
+
+def _sanitize_metadata(metadata: dict) -> dict:
+    return {str(k): _sanitize_metadata_value(v) for k, v in metadata.items()}
 
 
 def get_collection() -> chromadb.Collection:
@@ -57,6 +83,11 @@ def add_document(
     Each chunk gets a unique ID like ``{doc_id}_chunk_0``.
     Returns the number of chunks stored.
     """
+    if len(chunks) != len(embeddings):
+        raise ValueError("Chunk and embedding counts do not match")
+    if not chunks:
+        raise ValueError("No chunks to store")
+
     collection = get_collection()
     
     chunk_meta_list = (metadata or {}).pop("chunk_metadata", None)
@@ -72,9 +103,7 @@ def add_document(
         }
         if chunk_meta_list and i < len(chunk_meta_list):
             m.update(chunk_meta_list[i])
-        metadatas.append(m)
-
-    print(metadatas[:5])
+        metadatas.append(_sanitize_metadata(m))
 
     collection.upsert(
         ids=ids,
@@ -108,12 +137,16 @@ def query(
     elif doc_id:
         where_filter = {"doc_id": doc_id}
 
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k,
-        where=where_filter if where_filter else None,
-        include=["documents", "metadatas", "distances"],
-    )
+    try:
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            where=where_filter if where_filter else None,
+            include=["documents", "metadatas", "distances"],
+        )
+    except Exception as exc:
+        print(f"[chroma] query failed: {exc}")
+        return []
 
     items: list[dict] = []
     if results and results["documents"] and results["documents"][0]:

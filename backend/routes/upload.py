@@ -77,26 +77,43 @@ async def upload_document(
     # ── 3. Chunk with metadata ──────────────────────────────────────────
     chunks_with_meta = split_into_chunks_with_metadata(docs)
     chunk_texts = [c["text"] for c in chunks_with_meta]
+    if not chunk_texts:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="The uploaded document produced no indexable chunks.",
+        )
 
     # ── 4. Embed ────────────────────────────────────────────────────────
-    embeddings = get_embeddings(chunk_texts)
+    try:
+        embeddings = get_embeddings(chunk_texts)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create embeddings: {str(exc)}",
+        )
 
     # ── 5. Store in ChromaDB ────────────────────────────────────────────
     doc_id = str(uuid.uuid4())
     uid = user["uid"]
     
     # Pack metadata properly
-    num_stored = add_document(
-        doc_id=doc_id,
-        chunks=chunk_texts,
-        embeddings=embeddings,
-        metadata={
-            "filename": filename, 
-            "uid": uid,
-            # Pass custom chunk-level metadata
-            "chunk_metadata": [c["metadata"] for c in chunks_with_meta]
-        },
-    )
+    try:
+        num_stored = add_document(
+            doc_id=doc_id,
+            chunks=chunk_texts,
+            embeddings=embeddings,
+            metadata={
+                "filename": filename,
+                "uid": uid,
+                # Pass custom chunk-level metadata
+                "chunk_metadata": [c["metadata"] for c in chunks_with_meta],
+            },
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to store document in vector database: {str(exc)}",
+        )
 
     # ── 6. Log to Firebase Realtime DB ───────────────────────────────────
     try:

@@ -61,7 +61,13 @@ async def chat(
     now = datetime.now(timezone.utc).isoformat()
 
     # ── 1. Embed query ───────────────────────────────────────────────────
-    query_embedding = get_single_embedding(body.query)
+    try:
+        query_embedding = get_single_embedding(body.query)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to create query embedding: {str(exc)}",
+        )
 
     # ── 2. Retrieve relevant chunks (filtered by uid & doc_id) ────────────
     results = retrieval_query(
@@ -71,10 +77,16 @@ async def chat(
         doc_id=body.doc_id
     )
 
-    if not results:
-        context_chunks = ["no context provided"]
-        sources = []
-    else:
+    # If document-scoped retrieval returns nothing, retry with user-wide retrieval.
+    if body.doc_id and not results:
+        results = retrieval_query(
+            query_embedding,
+            top_k=5,
+            uid=uid,
+            doc_id=None,
+        )
+
+    if results:
         context_chunks = [r["text"] for r in results]
         sources = [
             SourceChunk(
@@ -85,17 +97,27 @@ async def chat(
             )
             for r in results
         ]
+    else:
+        context_chunks = []
+        sources = []
 
     # ── 3. Generate LLM response ────────────────────────────────────────
-    try:
-        answer = await generate_response(body.query, context_chunks, model_name)
-    except Exception as exc:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(
-            status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"LLM call failed: {str(exc)}",
+    if not context_chunks:
+        answer = (
+            "I could not find relevant indexed context for this question yet. "
+            "Please upload a supported file (PDF, DOCX, TXT), wait for indexing to complete, "
+            "and try again."
         )
+    else:
+        try:
+            answer = await generate_response(body.query, context_chunks, model_name)
+        except Exception as exc:
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"LLM call failed: {str(exc)}",
+            )
 
     # ── 4. Persist to Firebase Realtime DB ───────────────────────────────
     try:

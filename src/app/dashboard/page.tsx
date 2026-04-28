@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/button';
 import {
   MessageSquare,
@@ -16,10 +17,12 @@ import {
   X,
   Menu,
   Sparkles,
+  LogOut,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTheme } from '@/components/theme-provider';
 import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
@@ -47,6 +50,7 @@ type Chat = {
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { theme, toggleTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [chats, setChats] = useState<Chat[]>([
@@ -91,6 +95,7 @@ export default function DashboardPage() {
 
   const [selectedModel, setSelectedModel] = useState<'gpt' | 'llama'>('gpt');
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     const unsubscribe = auth.onAuthStateChanged((user) => {
@@ -275,6 +280,22 @@ export default function DashboardPage() {
     }
   };
 
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    try {
+      await signOut(auth);
+      toast.success('Logged out successfully');
+      router.push('/login');
+    } catch (err) {
+      toast.error('Failed to log out. Please try again.');
+      console.error(err);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   return (
     <div className="h-screen flex bg-background overflow-hidden">
       {/* Sidebar */}
@@ -353,6 +374,14 @@ export default function DashboardPage() {
                 <button className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors">
                   <Settings className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm">Settings</span>
+                </button>
+                <button
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <LogOut className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
                 </button>
               </div>
             </motion.aside>

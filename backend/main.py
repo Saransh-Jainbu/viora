@@ -22,7 +22,11 @@ async def lifespan(app: FastAPI):
     init_chroma()
 
     print("[startup] Loading embedding model...")
-    warmup_embeddings()
+    try:
+        warmup_embeddings()
+    except Exception as exc:
+        # Keep API alive in degraded mode so health checks pass and errors are explicit at request-time.
+        print(f"[startup] Embedding warmup skipped: {exc}")
 
     print("[startup] Backend ready.")
     yield
