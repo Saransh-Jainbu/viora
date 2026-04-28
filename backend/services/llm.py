@@ -100,22 +100,38 @@ def _call_openai(messages: list[dict]) -> str:
 
 async def _call_huggingface(messages: list[dict]) -> str:
     """Call Hugging Face Serverless Inference API asynchronously."""
-    url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct/v1/chat/completions"
+    url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
     headers = {
         "Authorization": f"Bearer {settings.huggingface_api_key}",
         "Content-Type": "application/json",
     }
+    
+    # Convert messages to a single prompt string
+    prompt = ""
+    for msg in messages:
+        role = msg.get("role", "user")
+        content = msg.get("content", "")
+        prompt += f"{role.upper()}: {content}\n"
+    prompt += "ASSISTANT:"
+    
     payload = {
-        "model": "meta-llama/Meta-Llama-3-8B-Instruct",
-        "messages": messages,
-        "max_tokens": 1024,
-        "temperature": 0.3,
+        "inputs": prompt,
+        "parameters": {
+            "max_new_tokens": 1024,
+            "temperature": 0.3,
+        }
     }
 
     async with httpx.AsyncClient(timeout=120.0) as client:
         resp = await client.post(url, headers=headers, json=payload)
         resp.raise_for_status()
         data = resp.json()
-        content = data["choices"][0]["message"]["content"].strip()
+        
+        # HF API returns list of dicts with "generated_text" key
+        if isinstance(data, list) and len(data) > 0:
+            content = data[0].get("generated_text", "").strip()
+        else:
+            content = data.get("generated_text", "").strip()
+        
         # Forcefully remove markdown bolding as a safety measure
         return content.replace("**", "")
