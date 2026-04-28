@@ -75,7 +75,12 @@ async def generate_response(
     if model_name == "gpt":
         return _call_openai(messages)
     elif model_name == "llama":
-        return await _call_huggingface(messages)
+        try:
+            return await _call_huggingface(messages)
+        except Exception as e:
+            print(f"⚠️  HuggingFace API failed ({type(e).__name__}): {e}")
+            print("   Falling back to OpenAI GPT-4...")
+            return _call_openai(messages)
     else:
         raise ValueError(f"Unknown model: '{model_name}'. Use 'gpt' or 'llama'.")
 
@@ -96,30 +101,29 @@ def _call_openai(messages: list[dict]) -> str:
     return content.replace("**", "")
 
 
-# ── Hugging Face (Llama) ────────────────────────────────────────────────────────────
+# ── Hugging Face (Inference Providers) ────────────────────────────────────────────────
 
 async def _call_huggingface(messages: list[dict]) -> str:
-    """Call Hugging Face Serverless Inference API asynchronously."""
-    url = "https://api-inference.huggingface.co/models/meta-llama/Meta-Llama-3-8B-Instruct"
+    """
+    Call Hugging Face Inference Providers API (new OpenAI-compatible endpoint).
+    
+    Uses the Inference Providers router which:
+    - Supports 120+ models
+    - Has OpenAI-compatible chat completions API
+    - Automatically selects the fastest provider
+    """
+    url = "https://router.huggingface.co/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {settings.huggingface_api_key}",
         "Content-Type": "application/json",
     }
     
-    # Convert messages to a single prompt string
-    prompt = ""
-    for msg in messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        prompt += f"{role.upper()}: {content}\n"
-    prompt += "ASSISTANT:"
-    
+    # Use Llama 3.1 8B or fall back to GPT-oss-120b
     payload = {
-        "inputs": prompt,
-        "parameters": {
-            "max_new_tokens": 1024,
-            "temperature": 0.3,
-        }
+        "model": "meta-llama/Llama-3.1-8B-Instruct:fastest",
+        "messages": messages,
+        "max_tokens": 1024,
+        "temperature": 0.3,
     }
 
     async with httpx.AsyncClient(timeout=120.0) as client:
@@ -127,11 +131,8 @@ async def _call_huggingface(messages: list[dict]) -> str:
         resp.raise_for_status()
         data = resp.json()
         
-        # HF API returns list of dicts with "generated_text" key
-        if isinstance(data, list) and len(data) > 0:
-            content = data[0].get("generated_text", "").strip()
-        else:
-            content = data.get("generated_text", "").strip()
+        # OpenAI-compatible response format
+        content = data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
         
         # Forcefully remove markdown bolding as a safety measure
         return content.replace("**", "")
